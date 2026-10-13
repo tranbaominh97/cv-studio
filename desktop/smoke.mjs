@@ -1,0 +1,134 @@
+// Runs only with CV_STUDIO_TEST_DIR set; never touches real CVs or opens a browser.
+import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+
+export async function runSmokeTest(window, store) {
+  const execute = script => window.webContents.executeJavaScript(script, true);
+  const waitFor = async (script, description) => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      if (await execute(script)) return;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error(`Timeout: ${description}\n${await execute('document.body.innerText')}`);
+  };
+  const click = text => execute(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === ${JSON.stringify(text)}).click()`);
+  const fill = (label, text) => execute(`(() => {
+    const input = Array.from(document.querySelectorAll('textarea')).find(e => e.getAttribute('aria-label') === ${JSON.stringify(label)});
+    input.focus();
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, ${JSON.stringify(text)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  const select = name => execute(`(() => {
+    const select = document.querySelector('#cv-select');
+    select.value = ${JSON.stringify(name)};
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await waitFor("document.querySelector('.cv-sheet') && !document.querySelector('.is-busy')", 'initial document');
+  const headingOrder = await execute("Array.from(document.querySelectorAll('.cv-section h2'), heading => heading.textContent)");
+  assert.equal(headingOrder.indexOf('CORE COMPETENCIES'), headingOrder.indexOf('EDUCATION') + 1, 'Shared layout puts competencies after education');
+  if (headingOrder.includes('LANGUAGES & TOOLS')) assert.ok(headingOrder.indexOf('CORE COMPETENCIES') < headingOrder.indexOf('LANGUAGES & TOOLS'));
+  assert.equal(await execute('typeof window.require'), 'undefined');
+  assert.ok(await execute("Object.keys(window.desktop).includes('save')"));
+  await fill('Họ và tên', 'Nguyễn Văn Test');
+  // Switch immediately, before the debounce fires: old implementation lost this edit.
+  await select('b.md');
+  await waitFor("document.querySelector('#cv-select').value === 'b.md' && !document.querySelector('.is-busy')", 'switch CV with pending save');
+  assert.deepEqual(await execute("Array.from(document.querySelectorAll('.cv-section h2'), heading => heading.textContent)"), headingOrder, 'Section order applies after switching CVs');
+  assert.equal((await store.load('a.md')).data.name, 'Nguyễn Văn Test');
+  await select('a.md');
+  await waitFor("document.querySelector('textarea[aria-label=\"Họ và tên\"]')?.value === 'Nguyễn Văn Test' && !document.querySelector('.is-busy')", 'reload persisted edit');
+  // Simulate screen-only sizing drift while leaving the printed page unchanged.
+  await execute(`(() => {
+    const style = document.createElement('style');
+    style.id = 'screen-sizing-regression';
+    style.textContent = '@media screen { .cv-content { min-height: 310mm; } }';
+    document.head.appendChild(style);
+  })()`);
+  await waitFor("document.querySelector('.page-card.warning')", 'estimated screen overflow');
+  await click('Xem bản in');
+  await waitFor("document.querySelector('.pdf-pages canvas') && !document.querySelector('.is-busy')", 'actual PDF preview');
+  await fs.writeFile(path.join(store.root, 'preview.png'), (await window.webContents.capturePage()).toPNG());
+  const pdf = Buffer.from(await execute('window.desktop.pdf().then(bytes => Array.from(bytes))'));
+  await fs.writeFile(path.join(store.root, 'one-page.pdf'), pdf);
+  assert.equal(await execute("document.querySelectorAll('.pdf-pages canvas').length"), 1);
+  assert.equal(await execute("Boolean(document.querySelector('.page-card.warning'))"), false, 'A verified one-page PDF must override screen overflow estimates');
+  await click('Quay lại sửa');
+  await waitFor("!document.querySelector('.behind-preview')", 'return to editing');
+  assert.equal(await execute("Boolean(document.querySelector('.page-card.warning'))"), false, 'PDF result remains authoritative after returning to edit');
+  await execute("document.getElementById('screen-sizing-regression').remove()");
+  await fs.writeFile(path.join(store.root, 'editor.png'), (await window.webContents.capturePage()).toPNG());
+  const externallyChanged = (await fs.readFile(path.join(store.root, 'a.md'), 'utf8')).replace('Nguyễn Văn Test', 'Codex external update');
+  await fs.writeFile(path.join(store.root, 'a.md'), externallyChanged);
+  await execute("window.dispatchEvent(new Event('focus'))");
+  await waitFor("document.body.innerText.includes('Có bản CV mới')", 'external-change notification');
+  await click('Nạp bản mới');
+  await waitFor("document.querySelector('textarea[aria-label=\"Họ và tên\"]')?.value === 'Codex external update' && !document.querySelector('.is-busy')", 'external reload');
+  const cvLayout = (await store.load('a.md')).layout;
+  const cvFont = await execute("getComputedStyle(document.querySelector('.cv-sheet')).fontFamily");
+  await fill('Họ và tên', 'Shared letter name');
+  await click('Cover Letter');
+  await waitFor("document.querySelector('#tab-cover-letter[aria-selected=true]') && !document.querySelector('.is-busy')", 'switch to letters with pending CV edit');
+  assert.equal((await store.load('a.md')).data.name, 'Shared letter name');
+  assert.equal(await execute("document.querySelector('#cv-select').options.length"), 1, 'Empty letters list excludes CVs');
+  await click('Tạo Cover Letter');
+  await execute(`document.querySelector('.modal form').requestSubmit()`);
+  await waitFor("document.querySelector('textarea[aria-label=\"Nội dung thư\"]') && !document.querySelector('.is-busy')", 'create cover letter');
+  const letterName = await execute("document.querySelector('#cv-select').value");
+  const letter = await store.load(letterName);
+  assert.equal(letter.data.name, 'Shared letter name');
+  assert.equal(letter.data.contact, (await store.load('a.md')).data.contact);
+  assert.deepEqual(letter.layout, cvLayout);
+  assert.equal(await execute("getComputedStyle(document.querySelector('.cv-sheet')).fontFamily"), cvFont);
+  const body = 'Tôi quan tâm đến vị trí ứng tuyển.\n\nKinh nghiệm **điều phối** và *hỗ trợ* phù hợp với công việc.\n\nCảm ơn quý công ty đã xem xét hồ sơ.';
+  await fill('Nội dung thư', body);
+  await click('CV');
+  await waitFor("document.querySelector('#tab-cv[aria-selected=true]') && !document.querySelector('.is-busy')", 'switch back with pending letter edit');
+  assert.equal((await store.load(letterName)).data.body, body);
+  assert.equal(await execute("document.querySelector('#cv-select').value"), 'a.md');
+  await click('Cover Letter');
+  await waitFor("document.querySelector('textarea[aria-label=\"Nội dung thư\"]') && !document.querySelector('.is-busy')", 'reopen letter');
+  assert.equal(await execute("document.querySelector('textarea[aria-label=\"Nội dung thư\"]').value"), body);
+  await click('Xem bản in');
+  await waitFor("document.querySelector('.pdf-pages canvas') && !document.querySelector('.is-busy')", 'letter PDF preview');
+  assert.equal(await execute("document.querySelectorAll('.pdf-pages canvas').length"), 1);
+  await fs.writeFile(path.join(store.root, 'cover-letter.pdf'), Buffer.from(await execute('window.desktop.pdf().then(bytes => Array.from(bytes))')));
+  await fs.writeFile(path.join(store.root, 'cover-letter-preview.png'), (await window.webContents.capturePage()).toPNG());
+  await click('Quay lại sửa');
+  await fill('Nội dung thư', Array(100).fill('Cover Letter overflow must remain visible and cannot be exported silently.').join('\n'));
+  await click('Xem bản in');
+  await waitFor("document.querySelectorAll('.pdf-pages canvas').length > 1 && !document.querySelector('.is-busy')", 'letter overflow');
+  await click('Lưu PDF');
+  await waitFor("document.body.innerText.includes('PDF có nhiều hơn 1 trang') && !document.querySelector('.is-busy')", 'letter export guard');
+  await click('Quay lại sửa');
+  await click('Hoàn tác chỉnh sửa');
+  await waitFor("document.querySelector('textarea[aria-label=\"Nội dung thư\"]')?.value === " + JSON.stringify(body), 'undo letter overflow');
+  await click('Tạo bản sao');
+  await execute("document.querySelector('.modal form').requestSubmit()");
+  await waitFor("!document.querySelector('.modal') && !document.querySelector('.is-busy')", 'duplicate letter');
+  const copiedLetter = await execute("document.querySelector('#cv-select').value");
+  assert.notEqual(copiedLetter, letterName);
+  assert.equal((await store.load(copiedLetter)).data.body, body);
+  assert.equal((await store.list('cover-letter')).length, 2);
+  await click('CV');
+  await waitFor("document.querySelector('#tab-cv[aria-selected=true]') && !document.querySelector('.is-busy')", 'return to CV after letter PDF');
+  assert.equal(await execute("Boolean(document.querySelector('.pdf-pages'))"), false, 'Switching documents invalidates PDF preview');
+  assert.equal(await execute("document.querySelector('#cv-select').options.length"), 2);
+  await fill('Giới thiệu', Array(100).fill('Long content should overflow visibly and must not be silently cropped.').join('\n'));
+  await waitFor("document.querySelector('.overflowing')", 'overflow warning');
+  await click('Xem bản in');
+  await waitFor("document.querySelectorAll('.pdf-pages canvas').length > 1 && !document.querySelector('.is-busy')", 'multi-page PDF');
+  const multi = Buffer.from(await execute('window.desktop.pdf().then(bytes => Array.from(bytes))'));
+  await fs.writeFile(path.join(store.root, 'overflow.pdf'), multi);
+  await click('Lưu PDF');
+  await waitFor("document.body.innerText.includes('PDF có nhiều hơn 1 trang') && !document.querySelector('.is-busy')", 'one-page export guard');
+  await click('Quay lại sửa');
+  await click('Hoàn tác chỉnh sửa');
+  await waitFor("!document.querySelector('.overflowing')", 'undo overflow');
+  await fill('Họ và tên', 'Saved on close');
+  window.close();
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.equal((await store.load('a.md')).data.name, 'Saved on close');
+  console.log('PASS native desktop: edit, immediate file switch, persistence, PDF preview, one-page output, external reload, overflow guard, undo, save on close.');
+}

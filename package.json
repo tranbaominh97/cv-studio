@@ -1,0 +1,50 @@
+{
+  "name": "cv-builder",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "desktop/main.mjs",
+  "description": "Sửa, duyệt và in CV một trang A4",
+  "author": "CV Studio",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.mjs",
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:desktop": "npm run build && node scripts/test-desktop.mjs",
+    "desktop": "npm run build && electron .",
+    "check:public": "node scripts/prepare-public.mjs",
+    "export:public": "node scripts/prepare-public.mjs --export",
+    "package:win": "npm run build && electron-builder --win portable --x64 --publish never",
+    "package:win:signed": "npm run build && electron-builder --win portable --x64 --publish never --config.win.signExecutable=true --config.forceCodeSigning=true",
+    "package:mac": "npm run build && electron-builder --mac dmg --x64 --arm64 --publish never"
+  },
+  "build": {
+    "appId": "local.cvstudio.desktop",
+    "productName": "CV Studio",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "desktop/**/*", "src/features/cv-editor/coverLetter.js", "package.json", "!node_modules/**/*"],
+    "asar": true,
+    "win": { "target": "portable", "artifactName": "CV Studio.exe", "icon": "public/app-icon.ico", "signExecutable": false },
+    "portable": { "requestExecutionLevel": "user" },
+    "mac": { "category": "public.app-category.productivity", "artifactName": "CV-Studio-${version}-macOS-${arch}.${ext}" }
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "lucide-react": "^0.395.0",
+    "pdfjs-dist": "^6.3.289",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
+    "vite": "^5.3.1"
+  }
+}
