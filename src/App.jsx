@@ -6,6 +6,7 @@ import { useCVState } from './features/cv-editor/hooks/useCVState';
 import CVEditor from './features/cv-editor/components/CVEditor';
 import TemplatePicker from './features/cv-editor/components/TemplatePicker';
 import PhotoEditor from './features/cv-editor/components/PhotoEditor';
+import WelcomeGuide from './features/cv-editor/components/WelcomeGuide';
 import { getTemplate, templates } from './features/cv-editor/templates';
 
 GlobalWorkerOptions.workerSrc = workerURL;
@@ -52,6 +53,14 @@ export default function App() {
   const [mode, setMode] = useState('edit');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return localStorage.getItem('cv-studio:welcome-v1') !== 'seen'; }
+    catch { return true; }
+  });
+  function closeWelcome() {
+    try { localStorage.setItem('cv-studio:welcome-v1', 'seen'); } catch { /* Show again next time if storage is unavailable. */ }
+    setShowWelcome(false);
+  }
   const modalRef = useRef(null);
   const [newName, setNewName] = useState('');
   const [flow, setFlow] = useState(null);
@@ -170,6 +179,7 @@ export default function App() {
       <div className="brand"><img className="brand-mark" src="./app-icon.png" alt="" /><div><b>CV Studio</b><small>{templates.length} mẫu CV · Hồ sơ của bạn.</small></div></div>
       {!flow && <div className="current-document"><strong title={cv.filename}>{cv.filename.replace(/\.md$/, '') || 'Chưa mở tài liệu'}</strong><div className="save-status" role="status">{cv.data && (cv.dirty ? <><span className="status-dot pending" />{cv.error ? 'Chưa lưu được' : 'Đang lưu...'}</> : <><Check size={15} />Đã lưu</>)}</div></div>}
       <div className="toolbar-actions">
+        <button onClick={() => setShowWelcome(true)}>Hướng dẫn</button>
         {!flow && <><button disabled={unavailable} className={mode === 'pdf' ? 'active' : ''} onClick={() => mode === 'pdf' ? setMode('edit') : run(preview)}>{mode === 'pdf' ? <Pencil size={17} /> : <Eye size={17} />}{mode === 'pdf' ? 'Quay lại sửa' : 'Xem bản in'}</button>
         <button disabled={unavailable} onClick={() => run(print)}><Printer size={17} />In</button>
         <button className="primary" disabled={unavailable} onClick={() => run(savePDF)}><Download size={17} />Lưu PDF</button></>}
@@ -247,5 +257,6 @@ export default function App() {
         <div className="modal-actions"><button type="button" onClick={() => setModal(null)}>Hủy</button><button className="primary" disabled={!newName.trim() || busy}>{modal === 'create-letter' ? 'Tạo Cover Letter' : 'Tạo bản sao'}</button></div>
       </form> : <><p>Bản đang sửa có thay đổi chưa lưu. Bạn có thể tạo bản sao trước để giữ lại.</p><div className="modal-actions"><button onClick={() => setModal(null)}>Hủy</button><button onClick={askDuplicate}>Tạo bản sao</button><button className="primary" onClick={() => run(reload)}>Bỏ sửa và nạp lại</button></div></>}
     </dialog>}
+    {showWelcome && <WelcomeGuide directory={cv.directory} onClose={closeWelcome} />}
   </div>;
 }

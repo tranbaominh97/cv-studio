@@ -31,6 +31,7 @@
 !/src/features/cv-editor/components/CVEditor.jsx
 !/src/features/cv-editor/components/TemplatePicker.jsx
 !/src/features/cv-editor/components/PhotoEditor.jsx
+!/src/features/cv-editor/components/WelcomeGuide.jsx
 !/src/features/cv-editor/components/ScoringPanel.jsx
 !/src/features/cv-editor/components/JobMatcher.jsx
 !/src/features/cv-editor/hooks/
@@ -43,6 +44,8 @@
 !/public/
 !/public/app-icon.png
 !/public/app-icon.ico
+!/public/cv/
+!/public/cv/SKILL.md
 !/examples/
 !/examples/sample.md
 !/scripts/

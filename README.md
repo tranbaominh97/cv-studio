@@ -2,6 +2,8 @@
 
 Ứng dụng desktop để sửa CV, viết Cover Letter và xuất PDF. Hồ sơ lưu trên máy của bạn.
 
+Lần đầu mở app có hướng dẫn bằng hình: lấy JD online → dùng Codex/ChatGPT → lưu CV `.md` vào thư mục được hiển thị → chọn mẫu và xuất PDF. Bấm **Hướng dẫn** để xem lại. **Sao chép lệnh /cv** kèm sẵn hướng dẫn và đường dẫn lưu để dán vào AI cùng JD và CV cũ. Skill nguồn nằm tại [public/cv/SKILL.md](public/cv/SKILL.md); có thể cài vào thư mục skills cá nhân với tên `cv`. JD và ghi chú nên để ngoài thư mục CV.
+
 ## Tải app
 
 Khi có bản phát hành, tải app tại [Releases](https://github.com/tranbaominh97/cv-studio/releases):

@@ -9,6 +9,20 @@ import { orderedSections } from '../src/features/cv-editor/sectionOrder.js';
 import { createCoverLetter } from '../src/features/cv-editor/coverLetter.js';
 import { createCVDocument, getTemplate, letterLayout, templates } from '../src/features/cv-editor/templates.js';
 
+test('cv skill example preserves all structured fields through the app parser', async () => {
+  const skill = await fs.readFile(new URL('../public/cv/SKILL.md', import.meta.url), 'utf8');
+  const markdown = skill.match(/```markdown\r?\n([\s\S]*?)```/)[1];
+  const cv = parseMarkdown(markdown);
+  assert.equal(cv.name, 'Applicant name');
+  assert.equal(cv.contact, 'person@example.com • City');
+  assert.deepEqual(cv.sections['WORK EXPERIENCE'][0], {
+    role: 'Role', company: 'Company', dateRange: '2022 - Present', location: 'City',
+    bullets: ['Supported achievement or responsibility.'],
+  });
+  assert.deepEqual(cv.sections.EDUCATION[0], { degree: 'Degree', school: 'University', dateRange: '2018 - 2022' });
+  assert.deepEqual(parseMarkdown(serializeCV(cv)), cv);
+});
+
 const raw = '# Nguyễn Test\ntest@example.com\n\nOperations Manager\nA complete summary.\n\n---\n\n## CORE COMPETENCIES\n\nPlanning · Communication\n\n## WORK EXPERIENCE\n\n### Manager — Example Company\n**2020 - Present | Ho Chi Minh City**\n\n- Managed **operations** without losing content.\n\n## EDUCATION\n\n**Bachelor**\nUniversity | 2014 - 2018\n\n## SKILLS\n\n- Excel\n- **Languages:** Vietnamese: native\n';
 
 test('new templates keep Markdown and source CV intact; fresh content and letters are independent', async t => {
