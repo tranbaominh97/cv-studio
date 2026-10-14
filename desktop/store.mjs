@@ -3,8 +3,9 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { parseMarkdown, serializeCV } from './markdown.mjs';
 import { letterFields, letterMarker } from '../src/features/cv-editor/coverLetter.js';
+import { defaultLayout, validateAppearance } from '../src/features/cv-editor/templates.js';
 
-export const defaultLayout = { fontSize: 11, lineHeight: 1.45, sectionGap: 10, margin: 10 };
+export { defaultLayout };
 
 export function validFilename(value) {
   if (typeof value !== 'string' || !value.trim() || value.length > 180 ||
@@ -45,6 +46,7 @@ export function validateDocument(data, layout) {
       throw new Error('Thiết lập trang nằm ngoài giới hạn.');
     }
   }
+  validateAppearance(layout);
 }
 
 async function atomicWrite(file, text) {

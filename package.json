@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "main": "desktop/main.mjs",
-  "description": "Sửa, duyệt và in CV một trang A4",
+  "description": "Chọn mẫu, sửa CV và xuất PDF A4",
   "author": "CV Studio",
   "scripts": {
     "dev": "vite",
@@ -25,7 +25,7 @@
     "appId": "local.cvstudio.desktop",
     "productName": "CV Studio",
     "directories": { "output": "release" },
-    "files": ["dist/**/*", "desktop/**/*", "src/features/cv-editor/coverLetter.js", "package.json", "!node_modules/**/*"],
+    "files": ["dist/**/*", "desktop/**/*", "src/features/cv-editor/coverLetter.js", "src/features/cv-editor/templates.js", "package.json", "!node_modules/**/*"],
     "asar": true,
     "win": { "target": "portable", "artifactName": "CV Studio.exe", "icon": "public/app-icon.ico", "signExecutable": false },
     "portable": { "requestExecutionLevel": "user" },

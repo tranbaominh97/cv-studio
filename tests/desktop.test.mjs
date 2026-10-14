@@ -7,8 +7,45 @@ import { createStore, defaultLayout, validFilename } from '../desktop/store.mjs'
 import { parseMarkdown, serializeCV } from '../desktop/markdown.mjs';
 import { orderedSections } from '../src/features/cv-editor/sectionOrder.js';
 import { createCoverLetter } from '../src/features/cv-editor/coverLetter.js';
+import { createCVDocument, getTemplate, letterLayout, templates } from '../src/features/cv-editor/templates.js';
 
 const raw = '# Nguyễn Test\ntest@example.com\n\nOperations Manager\nA complete summary.\n\n---\n\n## CORE COMPETENCIES\n\nPlanning · Communication\n\n## WORK EXPERIENCE\n\n### Manager — Example Company\n**2020 - Present | Ho Chi Minh City**\n\n- Managed **operations** without losing content.\n\n## EDUCATION\n\n**Bachelor**\nUniversity | 2014 - 2018\n\n## SKILLS\n\n- Excel\n- **Languages:** Vietnamese: native\n';
+
+test('new templates keep Markdown and source CV intact; fresh content and letters are independent', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cv-studio-templates-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.writeFile(path.join(directory, 'source.md'), raw);
+  const store = createStore(directory);
+  const source = await store.load('source.md');
+  assert.equal(getTemplate(source.layout.templateId).id, 'minimal');
+  for (const template of templates) {
+    const copy = createCVDocument(source, template.id);
+    assert.deepEqual(copy.data, source.data);
+    await store.save(`${template.id}.md`, copy.data, copy.layout, null, true);
+    const loaded = await store.load(`${template.id}.md`);
+    assert.equal(loaded.layout.templateId, template.id);
+    assert.deepEqual(loaded.data, source.data);
+    assert.equal(await fs.readFile(path.join(directory, `${template.id}.md`), 'utf8'), serializeCV(source.data));
+    copy.data.sections['WORK EXPERIENCE'][0].role = 'Changed in copy';
+    assert.equal(source.data.sections['WORK EXPERIENCE'][0].role, 'Manager');
+  }
+  assert.equal(await fs.readFile(path.join(directory, 'source.md'), 'utf8'), raw);
+  assert.deepEqual((await store.load('source.md')).layout, defaultLayout);
+  const blank = createCVDocument(null, 'portrait');
+  assert.equal(blank.data.summary, '');
+  assert.deepEqual(blank.data.sections['WORK EXPERIENCE'], []);
+  assert.equal(blank.layout.photo, undefined);
+  assert.deepEqual(letterLayout({ ...defaultLayout, templateId: 'modern', photo: 'CV-only photo' }), defaultLayout);
+  assert.throws(() => createCVDocument({ data: createCoverLetter(source.data) }, 'minimal'), /CV/);
+  assert.throws(() => createCVDocument(null, 'missing'), /Mẫu CV/);
+  for (const appearance of [{ templateId: 'missing' }, { photo: 'https://example.com/photo.jpg' }, { photo: 'data:image/svg+xml,<svg />' }, { photo: {} }, { photo: 'data:image/jpeg;base64,/9j/' + 'A'.repeat(2_000_000) }]) {
+    await assert.rejects(store.save('invalid.md', source.data, { ...defaultLayout, ...appearance }, null, true), /không hợp lệ/);
+  }
+  assert.equal((await store.list()).includes('invalid.md'), false);
+  const current = await store.load('modern.md');
+  await fs.writeFile(path.join(directory, '.cv-studio', 'modern.md.json'), JSON.stringify({ ...current.layout, templateId: 'bold' }));
+  await assert.rejects(store.save('modern.md', current.data, current.layout, current.revision), /bên ngoài/);
+});
 
 test('sample CVs survive parse / serialize / parse with section order intact', async () => {
   const files = (await fs.readdir('examples')).filter(name => name.endsWith('.md'));

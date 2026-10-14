@@ -26,8 +26,11 @@
 !/src/features/cv-editor/
 !/src/features/cv-editor/coverLetter.js
 !/src/features/cv-editor/sectionOrder.js
+!/src/features/cv-editor/templates.js
 !/src/features/cv-editor/components/
 !/src/features/cv-editor/components/CVEditor.jsx
+!/src/features/cv-editor/components/TemplatePicker.jsx
+!/src/features/cv-editor/components/PhotoEditor.jsx
 !/src/features/cv-editor/components/ScoringPanel.jsx
 !/src/features/cv-editor/components/JobMatcher.jsx
 !/src/features/cv-editor/hooks/

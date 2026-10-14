@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createCoverLetter } from '../coverLetter';
+import { defaultLayout, createCVDocument, letterLayout } from '../templates';
 
 const emptyCV = { name: 'Họ và tên', contact: 'Email • Số điện thoại • Địa chỉ', summary: '', sections: { 'WORK EXPERIENCE': [], EDUCATION: [], SKILLS: [] } };
-const defaultLayout = { fontSize: 11, lineHeight: 1.45, sectionGap: 10, margin: 10 };
 
 export function useCVState() {
   const [state, setState] = useState({ kind: 'cv', data: null, layout: defaultLayout, filename: '', files: [], directory: '', loading: true, dirty: false, saving: false, error: '', external: false, history: [] });
@@ -88,11 +88,21 @@ export function useCVState() {
     if (pending.current) await pending.current.catch(() => {});
     const newLetter = source.kind === 'cover-letter' && (fresh || !source.data);
     const data = newLetter ? createCoverLetter(sourceCV.current?.data) : source.data || emptyCV;
-    const layout = newLetter ? sourceCV.current?.layout || defaultLayout : source.layout;
+    const layout = newLetter ? letterLayout(sourceCV.current?.layout) : source.layout;
     // A fresh letter is independent; preserve pending edits to the current document first.
     if (fresh) await flush();
     await window.desktop.save(filename, data, layout, null, true);
     const list = await window.desktop.list(source.kind);
+    await load(filename, list);
+  }
+  async function createCV(name, templateId, sourceFilename, imported) {
+    await flush();
+    const source = imported || (sourceFilename ? await window.desktop.load(sourceFilename) : null);
+    const { data, layout } = createCVDocument(source, templateId);
+    const filename = name.trim().endsWith('.md') ? name.trim() : `${name.trim()}.md`;
+    await window.desktop.save(filename, data, layout, null, true);
+    const list = await window.desktop.list('cv');
+    publish({ kind: 'cv' });
     await load(filename, list);
   }
   async function reload() {
@@ -137,5 +147,5 @@ export function useCVState() {
     window.addEventListener('focus', onFocus);
     return () => { mounted.current = false; clearTimeout(timeout.current); offClose(); window.removeEventListener('focus', onFocus); };
   }, []);
-  return { ...state, sourceName: sourceCV.current?.filename || '', edit, undo, flush, changeKind, changeFile, duplicate, reload, chooseFolder, fail, clearError: () => publish({ error: '' }) };
+  return { ...state, sourceName: sourceCV.current?.filename || '', edit, undo, flush, changeKind, changeFile, duplicate, createCV, reload, chooseFolder, fail, clearError: () => publish({ error: '' }) };
 }

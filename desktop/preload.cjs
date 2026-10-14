@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktop', {
   load: invoke('cv:load'),
   save: invoke('cv:save'),
   chooseFolder: invoke('cv:folder'),
+  importCV: invoke('cv:import'),
   pdf: invoke('cv:pdf'),
   savePDF: invoke('cv:save-pdf'),
   print: invoke('cv:print'),

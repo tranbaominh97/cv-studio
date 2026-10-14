@@ -54,6 +54,15 @@ async function start() {
   });
   handle('cv:list', async kind => ({ files: await store.list(kind), directory: store.root }));
   handle('cv:load', name => store.load(name));
+  handle('cv:import', async () => {
+    const result = await dialog.showOpenDialog(window, { title: 'Chọn CV Markdown', properties: ['openFile'], filters: [{ name: 'CV Markdown', extensions: ['md'] }] });
+    if (result.canceled || !result.filePaths.length) return null;
+    const file = result.filePaths[0];
+    if ((await fs.stat(file)).size > 5_000_000) throw new Error('Chọn file CV .md dưới 5 MB.');
+    const source = await createStore(path.dirname(file)).load(path.basename(file));
+    if (source.data.type === 'cover-letter') throw new Error('Đây là Cover Letter. Hãy chọn một CV.');
+    return { ...source, filename: path.basename(file) };
+  });
   handle('cv:save', (name, data, layout, revision, create) => store.save(name, data, layout, revision, create === true));
   handle('cv:folder', async (kind = 'cv') => {
     const result = await dialog.showOpenDialog(window, { title: 'Chọn thư mục chứa CV (.md)', properties: ['openDirectory', 'createDirectory'] });
@@ -68,7 +77,10 @@ async function start() {
     if (printBusy) throw new Error('Đang tạo bản in, vui lòng đợi.');
     printBusy = true;
     try {
-      await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+      await window.webContents.executeJavaScript(`Promise.all([
+        document.fonts.ready,
+        ...Array.from(document.querySelectorAll('.paper-workspace .cv-photo'), image => image.decode())
+      ]).then(() => true)`);
       const bytes = await window.webContents.printToPDF({
         pageSize: 'A4', printBackground: true, displayHeaderFooter: false,
         preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 },
